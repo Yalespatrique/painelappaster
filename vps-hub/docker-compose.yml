@@ -1,0 +1,13 @@
+services:
+  hub:
+    build: .
+    container_name: asterplay-hub
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:8787:8787"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
