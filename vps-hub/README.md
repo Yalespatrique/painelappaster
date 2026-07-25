@@ -2,14 +2,14 @@
 
 Serviço Node/Docker que roda **fora do Lovable** com responsabilidades 24/7:
 
-- `POST /webhooks/asaas` — recebe pagamentos e atualiza o banco
+- `POST /webhooks/asaas` — recebe pagamentos; com `SERVICE_ROLE_KEY` atualiza o banco, sem ela encaminha para o backend seguro
 - `GET  /proxy/image?url=` — proxy de capas M3U para app Roku
 - `GET  /health` — healthcheck
 - **Cron interno** (`node-cron`):
   - `0 */6 * * *` — gera cobranças PIX para DNS vencendo
   - `*/15 * * * *` — envia lembretes WhatsApp via Evolution
 
-Compartilha o **mesmo Supabase** do painel Lovable (usando `service_role`).
+Quando houver `SUPABASE_SERVICE_ROLE_KEY`, compartilha o mesmo banco do painel. Sem essa chave, roda em **modo bridge** para receber o webhook na VPS e encaminhar ao backend seguro.
 
 ---
 
@@ -20,7 +20,7 @@ cd /opt/apps
 git clone https://github.com/Yalespatrique/painelappaster.git asterplay-hub
 cd asterplay-hub/vps-hub
 cp .env.example .env
-nano .env      # preencher SUPABASE_SERVICE_ROLE_KEY, ASAAS_API_KEY, EVOLUTION_*
+nano .env      # preencher ASAAS_API_KEY, ASAAS_WEBHOOK_TOKEN e EVOLUTION_*; SERVICE_ROLE_KEY pode ficar vazia
 docker compose up -d --build
 docker compose logs -f hub
 ```
@@ -67,4 +67,4 @@ docker compose up -d --build
 
 ## Variáveis de ambiente
 
-Veja `.env.example`. O container lê `app_settings` do Supabase como fallback (`asaas`, `evolution`, `whatsapp_templates`), então você pode editar pelo painel admin sem redeploy.
+Veja `.env.example`. Se `SUPABASE_SERVICE_ROLE_KEY` ficar vazia, o `/health` e o webhook Asaas funcionam em modo bridge; os crons locais ficam desativados.

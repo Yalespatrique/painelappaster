@@ -1,11 +1,33 @@
 import { Hono } from 'hono';
-import { supabase, getAppSetting } from '../lib/supabase.js';
+import { supabase, getAppSetting, hasServiceRoleCredentials } from '../lib/supabase.js';
 
 export const asaasWebhook = new Hono();
+
+const secureWebhookOrigin = (process.env.ASAAS_PROXY_ORIGIN || 'https://appasterplay.lovable.app').replace(/\/$/, '');
 
 async function getExpectedToken(): Promise<string> {
   const s = await getAppSetting<{ webhook_token?: string }>('asaas');
   return s?.webhook_token || process.env.ASAAS_WEBHOOK_TOKEN || '';
+}
+
+async function proxyToSecureBackend(c: any) {
+  const body = await c.req.text();
+  const contentType = c.req.header('content-type') || 'application/json';
+  const token = c.req.header('asaas-access-token') || c.req.header('access_token') || '';
+
+  const response = await fetch(`${secureWebhookOrigin}/api/public/asaas-webhook`, {
+    method: 'POST',
+    headers: {
+      'content-type': contentType,
+      'asaas-access-token': token,
+    },
+    body,
+  });
+
+  const text = await response.text();
+  return c.body(text || 'ok', response.status, {
+    'content-type': response.headers.get('content-type') || 'text/plain',
+  });
 }
 
 asaasWebhook.post('/', async (c) => {
@@ -14,6 +36,11 @@ asaasWebhook.post('/', async (c) => {
   if (!expected || provided !== expected) {
     console.warn('[asaas-webhook] token inválido');
     return c.text('Unauthorized', 401);
+  }
+
+  if (!hasServiceRoleCredentials) {
+    console.log('[asaas-webhook] modo bridge: encaminhando para backend seguro');
+    return proxyToSecureBackend(c);
   }
 
   let payload: any;

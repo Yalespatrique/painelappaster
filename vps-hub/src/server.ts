@@ -8,6 +8,7 @@ import { asaasWebhook } from './routes/asaas-webhook.js';
 import { imageProxy } from './routes/image-proxy.js';
 import { runDnsRenewal } from './cron/dns-renewal.js';
 import { runWhatsappReminders } from './cron/whatsapp-reminders.js';
+import { hasServiceRoleCredentials } from './lib/supabase.js';
 
 const app = new Hono();
 
@@ -27,14 +28,16 @@ serve({ fetch: app.fetch, port }, (info) => {
 });
 
 // Crons agendadas
-if (process.env.CRON_DNS_RENEWAL !== 'false') {
+if (!hasServiceRoleCredentials) {
+  console.log('🌉 modo bridge ativo: crons locais desativados sem SERVICE_ROLE_KEY');
+} else if (process.env.CRON_DNS_RENEWAL !== 'false') {
   cron.schedule('0 */6 * * *', () => {
     runDnsRenewal().catch((e) => console.error('[cron dns-renewal]', e));
   });
   console.log('⏰ cron dns-renewal: a cada 6h');
 }
 
-if (process.env.CRON_WHATSAPP_REMINDERS !== 'false') {
+if (hasServiceRoleCredentials && process.env.CRON_WHATSAPP_REMINDERS !== 'false') {
   cron.schedule('*/15 * * * *', () => {
     runWhatsappReminders().catch((e) => console.error('[cron whatsapp]', e));
   });
